@@ -1,0 +1,2 @@
+1. [Azure Speech and Open AI Credit Card Debt Collection] () -> notebook to carry out voice conversation with local microphone & speaker.
+2. [SST OpenAI TTS with Azure Communication Service] () -> Call out to a phone to carry out voice conversation 

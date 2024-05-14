@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+  
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voice AI with Azure OpenAI</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+  
+  <style>
+  .chat-container {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  background-color: #f8f8f8;
+}
+
+.chat-message {
+  padding: 10px;
+  margin: 10px 0;
+  border-radius: 10px;
+  color: white;
+}
+
+.left {
+  align-self: flex-start;
+  background-color: #007bff;
+}
+
+.right {
+  align-self: flex-end;
+  background-color: #28a745;
+}
+
+  </style>
+
+
+  <script>
+    var source;
+
+    function startStream() {
+      var call_id = document.getElementById('call_id').value;
+      source = new EventSource("/stream/" + call_id );
+      console.log("Stream started");
+      source.onmessage = function(event) {
+        console.log(event.data);
+
+        var messages = JSON.parse(event.data);
+        var chatPanel = document.getElementById('chat-panel');
+        clearChat();
+        for (var i = 1; i < messages.length; i++) {
+          if (messages[i].role === 'system') continue;
+          if (i == 2) continue;
+          var messageDiv = document.createElement('div');
+          messageDiv.className = 'chat-message ' + (messages[i].role === 'assistant' ? 'left' : 'right');
+          messageDiv.textContent = messages[i].content;
+          chatPanel.appendChild(messageDiv);
+        }
+      };
+    }
+
+    function stopStream() {
+      console.log(source);
+      if (source) {
+        source.close();
+        console.log("Stream stopped");
+      }
+    }
+
+    function clearChat() {
+      var chatPanel = document.getElementById('chat-panel');
+      while (chatPanel.firstChild) {
+        chatPanel.removeChild(chatPanel.firstChild);
+      }
+      
+      var summaryDiv = document.getElementById('summary');
+      while (summaryDiv.firstChild) {
+        summaryDiv.removeChild(summaryDiv.firstChild);
+      }
+    }
+
+    function resetMemory() {
+      
+      var call_id = document.getElementById('call_id').value;
+      fetch('/resetmemory/'+ call_id , {
+        method: 'get',
+      }).then(function(response) {
+        console.log(response);
+        if (response.status === 200) {
+          alert('Memory reset successfully');
+        }
+      });
+    }
+
+    function getSummary() {
+      stopStream();
+      var call_id = document.getElementById('call_id').value;
+      fetch('/summary/' + call_id, {
+        method: 'get',
+      }).then(function(response) {
+        if (response.status === 200) {
+          return response.json();
+        }
+      }).then(function(data) {
+        jsondata = JSON.parse(data);
+        var summaryDiv = document.getElementById('summary');
+        summaryDiv.innerHTML = `
+          Payment Intention: ${jsondata.payment_intention}<br>
+          Payment Date: ${jsondata.payment_date}<br>
+          Payment Amount: ${jsondata.payment_amount}<br>
+          Sentiment: ${jsondata.sentiment}<br>
+          Payment Preference: ${jsondata.payment_preference}
+        `;
+      });
+    }
+
+
+
+    function startNewCall() {
+        // Clear the input text
+        document.getElementById("mobilenumber").value = "";
+        // Remove the hidden input box
+        var hiddenInput = document.getElementById("call_id");
+        if(hiddenInput) {
+            hiddenInput.parentNode.removeChild(hiddenInput);
+        }
+        window.location.href = "/";
+    }
+
+    function hideMeAndShowReset()
+    {
+        var callOutButton = document.getElementById("call-out");
+        callOutButton.style.display = "none";
+        var startNewCallButton = document.getElementById("start-new-call");
+        startNewCallButton.style.display = "block";
+    }
+
+  </script>
+
+</head>
+<body>
+  <h4>Demo Voice AI with Azure OpenAI & Azure Communication Services</h4>
+
+
+  <div class="row">
+      <div class="col-auto">
+        
+        <form method="post" action="/outboundCall">
+          <div class="row g-3 align-items-center">
+            <div class="col-auto">
+              <label for="mobilenumber" class="col-form-label">Mobile Number</label>
+            </div>
+            <div class="col-auto">
+              {% if call_id %}
+                <input type="hidden" name="call_id" id="call_id" value="{{ call_id }}">
+              {% endif %}
+              <input type="text" name="mobilenumber" id="mobilenumber" class="form-control" placeholder="+65xxxxxxxxx" value="{% if phone_number %} {{phone_number}} {% endif %}">
+            </div>
+            <div class="col-auto">
+              {% if not phone_number %} 
+              <button type="submit" class="btn btn-primary" id="call-out" onclick="hideMeAndShowReset()">Call Out</button>
+              {% endif %}
+            </div>
+          </div>
+        </form>
+        
+      </div>
+
+      {% if phone_number %}
+      <div class="col-auto">
+        <button class="btn btn-primary" id="start-new-call" onclick="startNewCall()">Start New Call</button>
+      </div>
+      {% endif %}
+      
+      <div class="col-auto">
+        <button type="submit" class="btn btn-danger" onclick="resetMemory()">Reset Memory</button>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-danger" onclick="clearChat()">Clear Chat</button>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-success" onclick="startStream()">Start Stream</button>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-success" onclick="stopStream()">Stop Stream</button>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-warning" onclick="getSummary()">Get Summary</button>
+      </div>
+
+
+  </div>
+
+
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-lg-8 chat-container" id="chat-panel">
+        <!-- Chat content goes here -->
+      
+      </div>
+
+      <div class="col-lg-4" id="summary" >
+        <!-- Chat content goes here -->
+      
+      </div>
+
+    </div>
+  </div>
+
+
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+  
+</body>
+</html>
